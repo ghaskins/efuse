@@ -23,8 +23,7 @@ static ERL_NIF_TERM mount(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   if (enif_get_string(env, argv[0], path, sizeof(path), ERL_NIF_LATIN1) <= 0)
     return error_tuple("Bad path");
 
-  char *defarg[2] = {"efuse", NULL};
-  struct fuse_args fargs = FUSE_ARGS_INIT(1, defarg);
+  struct fuse_args fargs = FUSE_ARGS_INIT(0, NULL);
 
   ch = fuse_mount(path, &fargs);
   if (!ch) {
