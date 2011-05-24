@@ -10,7 +10,19 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    efuse_sup:start_link().
+    RequiredArgs = [mountpoint],
+
+    lists:foldl(fun(Arg, _Acc) ->
+                       case application:get_env(Arg) of
+                           undefined -> throw({"Missing required arg", Arg});
+                           _ -> ok
+                       end
+               end,
+               void, RequiredArgs),
+
+    {ok, MountPoint} = application:get_env(mountpoint),
+
+    efuse_sup:start_link(MountPoint).
 
 stop(_State) ->
     ok.
