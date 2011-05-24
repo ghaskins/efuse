@@ -10,7 +10,6 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    fuse:hello(),
     efuse_sup:start_link().
 
 stop(_State) ->
