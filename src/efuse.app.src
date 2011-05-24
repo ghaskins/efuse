@@ -1,0 +1,12 @@
+{application, efuse,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { efuse_app, []}},
+  {env, []}
+ ]}.
