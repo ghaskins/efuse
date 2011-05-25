@@ -10,7 +10,7 @@ start_link(MountPoint) ->
     gen_server:start_link(?MODULE, MountPoint, []).
 
 init(MountPoint) ->
-    Fd = fuse:mount(MountPoint),
+    {ok, Fd} = fuse:mount(MountPoint),
     {ok, #state{fd=Fd}}.
 
 handle_call(_Request, _From, State) -> 
