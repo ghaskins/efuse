@@ -10,7 +10,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    RequiredArgs = [mountpoint],
+    RequiredArgs = [mountpoint, handler],
 
     lists:foldl(fun(Arg, _Acc) ->
                        case application:get_env(Arg) of
@@ -21,8 +21,9 @@ start(_StartType, _StartArgs) ->
                void, RequiredArgs),
 
     {ok, MountPoint} = application:get_env(mountpoint),
+    {ok, Handler} = application:get_env(handler),
 
-    efuse_sup:start_link(MountPoint).
+    efuse_sup:start_link(MountPoint, Handler).
 
 stop(_State) ->
     ok.

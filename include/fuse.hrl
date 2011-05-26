@@ -39,8 +39,9 @@
 -define(FUSE_NOTIFY_REPLY  , 41).
 -define(FUSE_BATCH_FORGET  , 42).
 
--define(IN_HEADER_SIZE, 56).
+-define(IN_HEADER_SIZE, 40).
+-define(INIT_IN_SIZE, 16).
 
--record(in_header, {opcode, unique, nodeid, uid, gid, pid}).
+-record(in_header, {len, opcode, unique, nodeid, uid, gid, pid}).
 -record(out_header, {error, unique}).
 

@@ -1,27 +1,27 @@
 -module(chan).
 -behavior(gen_server).
 
--export([start_link/1, init/1]).
+-export([start_link/2, init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {fd}).
 
-start_link(MountPoint) ->
-    gen_server:start_link(?MODULE, MountPoint, []).
+start_link(MountPoint, Handler) ->
+    gen_server:start_link(?MODULE, [MountPoint, Handler], []).
 
-init(MountPoint) ->
+init([MountPoint, Handler]) ->
     {ok, Fd} = fuse:mount(MountPoint),
+
     spawn_link(fun() -> 
-		       lists:foreach(fun(Chan) ->
-					     initialize_channel(Chan, Fd)
-				     end,
-				     [output_chan, input_chan])
+		       initialize_channel(output_chan, [Fd]),
+		       initialize_channel(input_chan, [Fd, Handler])
 	       end),
+
     {ok, #state{fd=Fd}}.
 
-initialize_channel(Chan, Fd) ->
+initialize_channel(Chan, Options) ->
     {ok, _} = efuse_sup:start_child({erlang:now(),
-				     {Chan, start_link, [Fd]},
+				     {Chan, start_link, Options},
 				     transient,
 				     brutal_kill,
 				     worker,

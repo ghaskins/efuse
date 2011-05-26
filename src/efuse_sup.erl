@@ -4,7 +4,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/1, start_child/1]).
+-export([start_link/2, start_child/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -16,8 +16,8 @@
 %% API functions
 %% ===================================================================
 
-start_link(MountPoint) ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, [MountPoint]).
+start_link(MountPoint, Handler) ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, [MountPoint, Handler]).
 
 start_child(ChildSpec) ->
     supervisor:start_child(?MODULE, ChildSpec).
@@ -26,9 +26,9 @@ start_child(ChildSpec) ->
 %% Supervisor callbacks
 %% ===================================================================
 
-init([MountPoint]) ->
+init([MountPoint, Handler]) ->
     {ok, { {one_for_all, 5, 10},
 	   [
-	    ?CHILD(chan, worker, [MountPoint])
+	    ?CHILD(chan, worker, [MountPoint, Handler])
 	   ]} }.
 
