@@ -42,5 +42,5 @@
 -define(IN_HEADER_SIZE, 56).
 
 -record(in_header, {opcode, unique, nodeid, uid, gid, pid}).
-
+-record(out_header, {error, unique}).
 
