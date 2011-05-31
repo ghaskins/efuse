@@ -1,3 +1,7 @@
+-define(API_MAJOR, 7).
+-define(API_MINOR, 16).
+
+
 -define(FUSE_LOOKUP	   , 1).
 -define(FUSE_FORGET	   , 2).
 -define(FUSE_GETATTR	   , 3).
@@ -40,8 +44,11 @@
 -define(FUSE_BATCH_FORGET  , 42).
 
 -define(IN_HEADER_SIZE, 40).
--define(INIT_IN_SIZE, 16).
-
+-define(OUT_HEADER_SIZE, 16).
 -record(in_header, {len, opcode, unique, nodeid, uid, gid, pid}).
--record(out_header, {error, unique}).
+-record(out_header, {len, error, unique}).
 
+-define(INIT_IN_SIZE, 16).
+-record(init_in, {major, minor, max_readahead, flags}).
+-record(init_out, {major, minor, max_readahead=0, flags=0,
+		   max_background=0, congestion_threshold=0, max_write=0}).

@@ -4,11 +4,14 @@
 -export([start_link/2, init/1]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
+-import(output_chan, [send/1]).
+
 -export([connecting/1, idle/1]).
 
 -include("fuse.hrl").
+-include("errno.hrl").
 
--record(state, {fd, decoder, watcher, major, minor, max_readahead, flags}).
+-record(state, {fd, decoder, watcher, major, minor, flags}).
 
 start_link(Fd, Handler) ->
     gen_fsm:start_link(?MODULE, [Fd, Handler], []).
@@ -38,20 +41,58 @@ code_change(_OldVsn, _StateName, State, _Extra) ->
 connecting(State) ->
     {Header, Payload} = recv(State),
     #in_header{len=?IN_HEADER_SIZE+?INIT_IN_SIZE,
-	       opcode=?FUSE_INIT,
-	       unique=Unique} = Header,
-    <<Major:32/native,
-      Minor:32/native,
-      ReadAhead:32/native,
-      Flags:32/native>> = Payload,
-    error_logger:info_msg("FUSE: Connection established, Major: ~p Minor: ~p~n",
-			  [Major, Minor]),
-    output_chan:send(#out_header{error=0, unique=Unique}),
-    NewState = State#state{major=Major,
+	       opcode=?FUSE_INIT} = Header,
+    InitIn = fuse_packet:init_in(Payload),
+    negotiate(InitIn#init_in.major, Header, InitIn, State).
+
+% 
+% Version negotiation:
+% 
+% Both the kernel and userspace send the version they support in the
+% INIT request and reply respectively.
+% 
+% If the major versions match then both shall use the smallest
+% of the two minor versions for communication.
+% 
+% If the kernel supports a larger major version, then userspace shall
+% reply with the major version it supports, ignore the rest of the
+% INIT message and expect a new INIT message from the kernel with a
+% matching major version.
+% 
+% If the library supports a larger major version, then it shall fall
+% back to the major protocol version sent by the kernel for
+% communication and reply with that major version (and an arbitrary
+% supported minor version).
+% 
+negotiate(?API_MAJOR, Header, InitIn, State) ->
+    Minor = erlang:min(InitIn#init_in.minor, ?API_MINOR),
+    error_logger:info_msg("FUSE: Connection established, API: ~p.~p~n",
+			  [?API_MAJOR, Minor]),
+    send([
+	  #out_header{error=0, unique=Header#in_header.unique},
+	  #init_out{major=?API_MAJOR,
+		    minor=Minor,
+		    max_readahead=InitIn#init_in.max_readahead,
+		    flags=0
+		   }
+	 ]),
+    NewState = State#state{major=?API_MAJOR,
 			   minor=Minor,
-			   max_readahead=ReadAhead,
-			   flags=Flags},
-    {next_state, idle, NewState}.    
+			   flags=InitIn#init_in.flags},
+    {next_state, idle, NewState};
+negotiate(Major, Header, InitIn, State) when Major > ?API_MAJOR ->
+    error_logger:info_msg("FUSE: Kernel is too new (API: ~p.~p), renegotiate~n",
+			  [Major, InitIn#init_in.minor]),
+    send([
+	  #out_header{error=0, unique=Header#in_header.unique},
+	  #init_out{major=?API_MAJOR,
+		    minor=?API_MINOR
+		   }
+	 ]),
+    {next_state, connecting, State}; % remain in connecting state
+negotiate(_Major, Header, _InitIn, State) ->
+    send(#out_header{error=?EPROTO, unique=Header#in_header.unique}),
+    {stop, "Incompatible Protocol", State}.
 
 idle(State) ->
     {Header, Payload} = recv(State),
@@ -62,18 +103,6 @@ idle(State) ->
      ),
     {next_state, idle, State}.
 
-decode_in_header(<<Len:32/native,
-		   OpCode:32/native,
-		   Unique:64/native,
-		   NodeId:64/native,
-		   Uid:32/native,
-		   Gid:32/native,
-		   Pid:32/native,
-		   _T/binary>>=Data)
-  when size(Data) =:= ?IN_HEADER_SIZE ->
-    #in_header{len=Len, opcode=OpCode, unique=Unique,
-	       nodeid=NodeId, uid=Uid, gid=Gid, pid=Pid}.
-
 recv(State, Len) ->
     {ok, Data} = procket:read(State#state.fd, Len),
     Data.
@@ -81,7 +110,7 @@ recv(State, Len) ->
 recv(State) ->
     RawData = recv(State, 65536),
     RawHeader = binary:part(RawData, {0, ?IN_HEADER_SIZE}),
-    Header = decode_in_header(RawHeader),
+    Header = fuse_packet:in_header(RawHeader),
     Payload = if
 		  Header#in_header.len =:= size(RawData) ->
 		      Remain = Header#in_header.len - ?IN_HEADER_SIZE,

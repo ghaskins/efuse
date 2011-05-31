@@ -25,12 +25,23 @@ send(Data) ->
 
 %----------------------------------------------------------------
 
-handle_call({send, Data}, _From, State) ->
-    lists:foreach(fun(Datum) ->
-			  EncodedDatum = encode(Datum),
-			  procket:write(State#state.fd, EncodedDatum)
-		  end,
-		  Data),
+handle_call({send, [Header]}, _From, State) when is_record(Header, out_header) ->
+    EncodedHeader = encode(Header#out_header{len=?OUT_HEADER_SIZE}),
+    ok = procket:write(State#state.fd, EncodedHeader),
+
+    {reply, ok, State};
+handle_call({send, [Header | Payload]}, _From, State)
+  when is_record(Header, out_header)->
+
+    EncodedPayload = [ encode(Datum) || Datum <- Payload],
+    Len = lists:foldl(fun(Datum, Acc) ->
+			      Acc + size(Datum)
+		      end,
+		      0, EncodedPayload),
+
+    EncodedHeader = encode(Header#out_header{len=Len+?OUT_HEADER_SIZE}),
+    ok = procket:writev(State#state.fd, [EncodedHeader | EncodedPayload]),
+
     {reply, ok, State};
 handle_call(_Request, _From, State) -> 
     {reply, {error, notsup}, State}.
@@ -51,7 +62,19 @@ code_change(_OldVsn, State, _Extra) ->
 
 encode(Datum) when is_binary(Datum) ->
     Datum;
-encode(#out_header{error=Error, unique=Unique})  ->
-    <<16:32/native, Error:32/native, Unique:64/native>>;
+encode(#out_header{len=Len, error=Error, unique=Unique})  ->
+    <<Len:32/native,
+      Error:32/native,
+      Unique:64/native>>;
+encode(#init_out{major=Major, minor=Minor, max_readahead=ReadAhead,
+		 flags=Flags, max_background=MaxBackground,
+		 congestion_threshold=Congestion, max_write=MaxWrite}) ->
+    <<Major:32/native,
+      Minor:32/native,
+      ReadAhead:32/native,
+      Flags:32/native,
+      MaxBackground:16/native,
+      Congestion:16/native,
+      MaxWrite:32/native>>;
 encode(Datum) ->
     erlang:throw({"unsupported datum", Datum}). 
