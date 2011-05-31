@@ -18,19 +18,8 @@ init(Fd) ->
 
 %----------------------------------------------------------------
 
-send(Data) when is_list(Data) ->
-    gen_server:call(?MODULE, {send, Data}); 
-send(Data) ->
-    send([Data]).
-
-%----------------------------------------------------------------
-
-handle_call({send, [Header]}, _From, State) when is_record(Header, out_header) ->
-    EncodedHeader = encode(Header#out_header{len=?OUT_HEADER_SIZE}),
-    ok = procket:write(State#state.fd, EncodedHeader),
-
-    {reply, ok, State};
-handle_call({send, [Header | Payload]}, _From, State)
+send([Header | Payload])
+  % perform the encoding in the client context for better scaling
   when is_record(Header, out_header)->
 
     EncodedPayload = [ encode(Datum) || Datum <- Payload],
@@ -40,8 +29,14 @@ handle_call({send, [Header | Payload]}, _From, State)
 		      0, EncodedPayload),
 
     EncodedHeader = encode(Header#out_header{len=Len+?OUT_HEADER_SIZE}),
-    ok = procket:writev(State#state.fd, [EncodedHeader | EncodedPayload]),
+    gen_server:call(?MODULE, {send, [EncodedHeader | EncodedPayload]});
+send(Data) ->
+    send([Data]).
 
+%----------------------------------------------------------------
+
+handle_call({send, Data}, _From, State) ->
+    ok = procket:writev(State#state.fd, Data),
     {reply, ok, State};
 handle_call(_Request, _From, State) -> 
     {reply, {error, notsup}, State}.
