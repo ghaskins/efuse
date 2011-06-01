@@ -18,7 +18,7 @@ init(Fd) ->
 
 %----------------------------------------------------------------
 
-send([Header | Payload])
+send([Header | Payload]=Data)
   % perform the encoding in the client context for better scaling
   when is_record(Header, out_header)->
 
@@ -36,6 +36,7 @@ send(Data) ->
 %----------------------------------------------------------------
 
 handle_call({send, Data}, _From, State) ->
+    io:format("SEND: ~p~n", [Data]),
     ok = procket:writev(State#state.fd, Data),
     {reply, ok, State};
 handle_call(_Request, _From, State) -> 
@@ -71,5 +72,17 @@ encode(#init_out{major=Major, minor=Minor, max_readahead=ReadAhead,
       MaxBackground:16/native,
       Congestion:16/native,
       MaxWrite:32/native>>;
+encode(#kstatfs{blocks=Blocks, bfree=Bfree, bavail=Bavail,
+		files=Files, ffree=Ffree, bsize=Bsize,
+		namelen=Namelen, frsize=Frsize}) ->
+    <<Blocks:64/native,
+      Bfree:64/native,
+      Bavail:64/native,
+      Files:64/native,
+      Ffree:64/native,
+      Bsize:32/native,
+      Namelen:32/native,
+      Frsize:32/native,
+      0:224>>;
 encode(Datum) ->
     erlang:throw({"unsupported datum", Datum}). 

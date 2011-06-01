@@ -52,3 +52,6 @@
 -record(init_in, {major, minor, max_readahead, flags}).
 -record(init_out, {major, minor, max_readahead=0, flags=0,
 		   max_background=0, congestion_threshold=0, max_write=0}).
+
+-record(kstatfs, {blocks=0, bfree=0, bavail=0, files=0,
+		  ffree=0, bsize=0, namelen=0, frsize=0}).

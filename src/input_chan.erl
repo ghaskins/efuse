@@ -1,7 +1,7 @@
 -module(input_chan).
 -behavior(gen_fsm).
 
--export([start_link/2, init/1]).
+-export([start_link/3, init/1]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
 -import(output_chan, [send/1]).
@@ -11,15 +11,23 @@
 -include("fuse.hrl").
 -include("errno.hrl").
 
--record(state, {fd, decoder, watcher, major, minor, flags}).
+-record(state, {fd, decoder, watcher, major, minor, flags, tracer}).
 
-start_link(Fd, Handler) ->
-    gen_fsm:start_link(?MODULE, [Fd, Handler], []).
+start_link(Fd, Handler, Cookie) ->
+    gen_fsm:start_link(?MODULE, [Fd, Handler, Cookie], []).
 
-init([Fd, Handler]) ->
-    Decoder = decoder:init(Handler),
+tracer() ->
+    receive
+	Msg ->
+	    io:format("TRACE: ~p~n", [Msg])
+    end,
+    tracer().
+
+init([Fd, Handler, Cookie]) ->
+    Decoder = decoder:init(Handler, Cookie),
+    Tracer = spawn_link(fun() -> tracer() end),
     {ok, Watcher} = procket:watcher_create(Fd, 1, []),
-    {ok, connecting, #state{fd=Fd, decoder=Decoder, watcher=Watcher}}.
+    {ok, connecting, #state{fd=Fd, decoder=Decoder, watcher=Watcher, tracer=Tracer}}.
 
 handle_event(Event, _StateName, _State) -> 
     erlang:throw({"Bad event", Event}).
@@ -98,6 +106,9 @@ idle(State) ->
     {Header, Payload} = recv(State),
     spawn_link(
       fun() ->
+	      %erlang:trace(self(), true, [call, {tracer, State#state.tracer}]),
+	      %erlang:trace_pattern({decoder, '_', '_'}, true, [local]),
+
 	      decoder:process(Header, Payload, State#state.decoder)
       end
      ),
@@ -105,6 +116,7 @@ idle(State) ->
 
 recv(State, Len) ->
     {ok, Data} = procket:read(State#state.fd, Len),
+    io:format("RECV: ~p~n", [Data]),
     Data.
 
 recv(State) ->
