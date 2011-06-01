@@ -1,0 +1,12 @@
+{application, hellofuse,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { hellofuse_app, []}},
+  {env, []}
+ ]}.
