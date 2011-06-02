@@ -30,8 +30,12 @@ decode(?FUSE_LOOKUP, _Header, _Payload, _State) ->
     {ok, ?ENOSYS, []};
 decode(?FUSE_FORGET, _Header, _Payload, _State) ->	
     {ok, ?ENOSYS, []};
-decode(?FUSE_GETATTR, _Header, _Payload, _State) ->
-    {ok, ?ENOSYS, []};
+decode(?FUSE_GETATTR, Header, _Payload, State) ->
+    Module = State#state.handler,
+    case Module:getattr(Header#in_header.nodeid, State#state.cookie) of
+	{ok, Result} when is_record(Result, attr) -> 
+	    {ok, 0, [Result]}
+    end;
 decode(?FUSE_SETATTR, _Header, _Payload, _State) ->
     {ok, ?ENOSYS, []};
 decode(?FUSE_READLINK, _Header, _Payload, _State) ->

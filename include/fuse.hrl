@@ -43,6 +43,30 @@
 -define(FUSE_NOTIFY_REPLY  , 41).
 -define(FUSE_BATCH_FORGET  , 42).
 
+-define(S_IFMT    , 8#170000). % bit mask for the file type bit fields
+-define(S_IFSOCK  , 8#140000). % socket
+-define(S_IFLNK   , 8#120000). % symbolic link
+-define(S_IFREG   , 8#100000). % regular file
+-define(S_IFBLK   , 8#060000). % block device
+-define(S_IFDIR   , 8#040000). % directory
+-define(S_IFCHR   , 8#020000). % character device
+-define(S_IFIFO   , 8#010000). % FIFO
+-define(S_ISUID   , 8#004000). % set UID bit
+-define(S_ISGID   , 8#002000). % set-group-ID bit (see below)
+-define(S_ISVTX   , 8#001000). % sticky bit (see below)
+-define(S_IRWXU   , 8#000700). % mask for file owner permissions
+-define(S_IRUSR   , 8#000400). % owner has read permission
+-define(S_IWUSR   , 8#000200). % owner has write permission
+-define(S_IXUSR   , 8#000100). % owner has execute permission
+-define(S_IRWXG   , 8#000070). % mask for group permissions
+-define(S_IRGRP   , 8#000040). % group has read permission
+-define(S_IWGRP   , 8#000020). % group has write permission
+-define(S_IXGRP   , 8#000010). % group has execute permission
+-define(S_IRWXO   , 8#000007). % mask for permissions for others (not in group)
+-define(S_IROTH   , 8#000004). % others have read permission
+-define(S_IWOTH   , 8#000002). % others have write permission
+-define(S_IXOTH   , 8#000001). % others have execute permission
+
 -define(IN_HEADER_SIZE, 40).
 -define(OUT_HEADER_SIZE, 16).
 -record(in_header, {len, opcode, unique, nodeid, uid, gid, pid}).
@@ -55,3 +79,9 @@
 
 -record(kstatfs, {blocks=0, bfree=0, bavail=0, files=0,
 		  ffree=0, bsize=0, namelen=0, frsize=0}).
+
+-record(getattr_in, {flags, fh}).
+-record(attr, {timeout=1, timeoutnsec=0, ino, size=0, blocks=0,
+	       atime=0, mtime=0, ctime=0,
+	       atimensec=0, mtimensec=0, ctimensec=0,
+	       mode=0, nlink=0, uid=0, gid=0, rdev=0, blksize=0}).

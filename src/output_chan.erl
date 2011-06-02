@@ -84,5 +84,30 @@ encode(#kstatfs{blocks=Blocks, bfree=Bfree, bavail=Bavail,
       Namelen:32/native,
       Frsize:32/native,
       0:224>>;
+encode(#attr{timeout=Timeout, timeoutnsec=Timeoutnsec,
+	     ino=Ino, size=Size, blocks=Blocks,
+	     atime=Atime, mtime=Mtime, ctime=Ctime,
+	     atimensec=Atimensec, mtimensec=Mtimensec, ctimensec=Ctimensec,
+	     mode=Mode, nlink=Nlink,
+	     uid=Uid, gid=Gid, rdev=Rdev, blksize=Blksize}) ->
+    <<Timeout:64/native,
+      Timeoutnsec:32/native,
+      0:32, %padding
+      Ino:64/native,
+      Size:64/native,
+      Blocks:64/native,
+      Atime:64/native,
+      Mtime:64/native,
+      Ctime:64/native,
+      Atimensec:32/native,
+      Mtimensec:32/native,
+      Ctimensec:32/native,
+      Mode:32/native,
+      Nlink:32/native,
+      Uid:32/native,
+      Gid:32/native,
+      Rdev:32/native,
+      Blksize:32/native,
+      0:32>>; %padding
 encode(Datum) ->
     erlang:throw({"unsupported datum", Datum}). 
