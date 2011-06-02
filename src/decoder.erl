@@ -14,18 +14,21 @@ init(Handler, Cookie) ->
 process(Header, Payload, State) ->
     OpCode = Header#in_header.opcode,
     io:format("Msg: ~p -> ~p~n", [OpCode, Payload]),
-    {ok, Error, Reply} = try decode(OpCode, Header, Payload, State)
-			 catch
-			     error:undef ->
-				 error_logger:error_msg("OpCode: ~p undefined~n",
-							[OpCode]),
-				 {ok, -?ENOSYS, []};
-			     T:E ->
-				 error_logger:error_msg("General request failure: H:~p P:~p E: ~p:~p~n",
-							[Header, Payload, T, E]),
-				 {ok, -1, []}
-			 end,
+    {ok, Error, Reply} = safe_decode(OpCode, Header, Payload, State),
     send([#out_header{error=Error, unique=Header#in_header.unique} | Reply]).
+
+safe_decode(OpCode, Header, Payload, State) ->
+ try decode(OpCode, Header, Payload, State)
+ catch
+     error:undef ->
+	 error_logger:error_msg("OpCode: ~p undefined~n",
+				[OpCode]),
+	 {ok, -?ENOSYS, []};
+     T:E ->
+	 error_logger:error_msg("General request failure: H:~p P:~p E: ~p:~p~n",
+				[Header, Payload, T, E]),
+	 {ok, -1, []}
+ end.    
 
 decode(?FUSE_LOOKUP, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
@@ -33,10 +36,7 @@ decode(?FUSE_FORGET, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
 decode(?FUSE_GETATTR, Header, _Payload, State) ->
     Module = State#state.handler,
-    case Module:getattr(Header#in_header.nodeid, State#state.cookie) of
-	{ok, Result} when is_record(Result, attr) -> 
-	    {ok, 0, [Result]}
-    end;
+    Module:getattr(Header#in_header.nodeid, State#state.cookie);
 decode(?FUSE_SETATTR, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
 decode(?FUSE_READLINK, _Header, _Payload, _State) ->
@@ -63,9 +63,7 @@ decode(?FUSE_WRITE, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
 decode(?FUSE_STATFS, _Header, _Payload, State) ->
     Module = State#state.handler,
-    try Module:statfs(State#state.cookie) of
-	{ok, Result} when is_record(Result, kstatfs) -> 
-	    {ok, 0, [Result]}
+    try Module:statfs(State#state.cookie)
     catch
 	error:undef ->
 	    {ok, 0, [#kstatfs{namelen=255, bsize=512}]}
