@@ -102,7 +102,10 @@ negotiate(?API_MAJOR, Header, InitIn, State) ->
 	  #init_out{major=?API_MAJOR,
 		    minor=Minor,
 		    max_readahead=InitIn#init_in.max_readahead,
-		    flags=Flags
+		    flags=Flags,
+		    max_background=65536,
+		    congestion_threshold=60000,
+		    max_write=65536
 		   }
 	 ]),
 
