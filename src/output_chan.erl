@@ -5,20 +5,19 @@
 
 -export([start_link/1, init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([send/1]).
+-export([send/2, set_compat/3]).
 
--record(state, {fd}).
+-record(state, {fd, apiver={?API_MAJOR, ?API_MINOR}, flags=0}).
 
 start_link(Fd) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, Fd, []).
+    gen_server:start_link(?MODULE, [Fd], []).
 
-
-init(Fd) ->
+init([Fd]) ->
     {ok, #state{fd=Fd}}.
 
 %----------------------------------------------------------------
 
-send([Header | Payload]=Data)
+send(Pid, [Header | Payload]=Data)
   % perform the encoding in the client context for better scaling
   when is_record(Header, out_header)->
 
@@ -29,12 +28,17 @@ send([Header | Payload]=Data)
 		      0, EncodedPayload),
 
     EncodedHeader = encode(Header#out_header{len=Len+?OUT_HEADER_SIZE}),
-    gen_server:call(?MODULE, {send, [EncodedHeader | EncodedPayload]});
-send(Data) ->
-    send([Data]).
+    gen_server:call(Pid, {send, [EncodedHeader | EncodedPayload]});
+send(Pid, Data) ->
+    send(Pid, [Data]).
+
+set_compat(Pid, ApiVer, Flags) ->
+    gen_server:call(Pid, {set_compat, ApiVer, Flags}).
 
 %----------------------------------------------------------------
 
+handle_call({set_compat, ApiVer, Flags}, _From, State) ->
+    {reply, ok, State#state{apiver=ApiVer, flags=Flags}};
 handle_call({send, Data}, _From, State) ->
     io:format("SEND: ~p~n", [Data]),
     ok = procket:writev(State#state.fd, Data),

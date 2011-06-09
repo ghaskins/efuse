@@ -1,21 +1,22 @@
 -module(decoder).
--export([init/2, process/3]).
+-export([init/5, process/3]).
 
--import(output_chan, [send/1]).
+-import(output_chan, [send/2]).
 
 -include("fuse.hrl").
 -include("errno.hrl").
 
--record(state, {handler, cookie}).
+-record(state, {handler, cookie, opid, apiver, flags}).
 
-init(Handler, Cookie) ->
-    #state{handler=Handler, cookie=Cookie}.
+init(Handler, Cookie, OPid, ApiVer, Flags) ->
+    #state{handler=Handler, cookie=Cookie, opid=OPid, apiver=ApiVer, flags=Flags}.
 
 process(Header, Payload, State) ->
     OpCode = Header#in_header.opcode,
     io:format("Msg: ~p -> ~p~n", [OpCode, Payload]),
     {ok, Error, Reply} = safe_decode(OpCode, Header, Payload, State),
-    send([#out_header{error=Error, unique=Header#in_header.unique} | Reply]).
+    send(State#state.opid,
+	 [#out_header{error=Error, unique=Header#in_header.unique} | Reply]).
 
 safe_decode(OpCode, Header, Payload, State) ->
  try decode(OpCode, Header, Payload, State)

@@ -4,17 +4,18 @@
 -export([start_link/3, init/1]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
--import(output_chan, [send/1]).
+-import(output_chan, [send/2]).
 
 -export([connecting/1, idle/1]).
 
 -include("fuse.hrl").
 -include("errno.hrl").
 
--record(state, {fd, decoder, watcher, major, minor, flags, tracer}).
+-record(state, {fd, watcher, handler, cookie, decoder,
+		major, minor, flags, tracer, opid}).
 
-start_link(Fd, Handler, Cookie) ->
-    gen_fsm:start_link(?MODULE, [Fd, Handler, Cookie], []).
+start_link(MountPoint, Handler, Cookie) ->
+    gen_fsm:start_link(?MODULE, [MountPoint, Handler, Cookie], []).
 
 tracer() ->
     receive
@@ -23,11 +24,12 @@ tracer() ->
     end,
     tracer().
 
-init([Fd, Handler, Cookie]) ->
-    Decoder = decoder:init(Handler, Cookie),
+init([MountPoint, Handler, Cookie]) ->
+    {ok, Fd} = fuse:mount(MountPoint),
     Tracer = spawn_link(fun() -> tracer() end),
     {ok, Watcher} = procket:watcher_create(Fd, 1, []),
-    {ok, connecting, #state{fd=Fd, decoder=Decoder, watcher=Watcher, tracer=Tracer}}.
+    {ok, connecting, #state{fd=Fd, watcher=Watcher, handler=Handler,
+			    cookie=Cookie, tracer=Tracer}}.
 
 handle_event(Event, _StateName, _State) -> 
     erlang:throw({"Bad event", Event}).
@@ -47,11 +49,21 @@ code_change(_OldVsn, _StateName, State, _Extra) ->
     {ok, State}.
 
 connecting(State) ->
+    {ok, Pid} =
+	efuse_mount_sup:start_child({erlang:make_ref(),
+				     {output_chan,
+				      start_link,
+				      [State#state.fd]},
+				     transient,
+				     brutal_kill,
+				     worker,
+				     [output_chan]
+				    }),
     {Header, Payload} = recv(State),
     #in_header{len=?IN_HEADER_SIZE+?INIT_IN_SIZE,
 	       opcode=?FUSE_INIT} = Header,
     InitIn = fuse_packet:init_in(Payload),
-    negotiate(InitIn#init_in.major, Header, InitIn, State).
+    negotiate(InitIn#init_in.major, Header, InitIn, State#state{opid=Pid}).
 
 % 
 % Version negotiation:
@@ -74,24 +86,37 @@ connecting(State) ->
 % 
 negotiate(?API_MAJOR, Header, InitIn, State) ->
     Minor = erlang:min(InitIn#init_in.minor, ?API_MINOR),
-    error_logger:info_msg("FUSE: Connection established, API: ~p.~p~n",
-			  [?API_MAJOR, Minor]),
-    send([
+    FlagsRequested = InitIn#init_in.flags,
+    Flags = 0, % FIXME
+    error_logger:info_msg("FUSE: Connection established, API: ~p.~p, Flags: ~p~n",
+			  [?API_MAJOR, Minor, Flags]),
+
+    ok = output_chan:set_compat(State#state.opid,
+				{?API_MAJOR, Minor},
+				Flags),
+    Decoder = decoder:init(State#state.handler, State#state.cookie,
+			   State#state.opid, {?API_MAJOR, Minor}, Flags),
+    send(State#state.opid,
+	 [
 	  #out_header{error=0, unique=Header#in_header.unique},
 	  #init_out{major=?API_MAJOR,
 		    minor=Minor,
 		    max_readahead=InitIn#init_in.max_readahead,
-		    flags=0
+		    flags=Flags
 		   }
 	 ]),
-    NewState = State#state{major=?API_MAJOR,
+
+    NewState = State#state{decoder=Decoder,
+			   major=?API_MAJOR,
 			   minor=Minor,
-			   flags=InitIn#init_in.flags},
+			   flags=Flags},
+
     {next_state, idle, NewState};
 negotiate(Major, Header, InitIn, State) when Major > ?API_MAJOR ->
     error_logger:info_msg("FUSE: Kernel is too new (API: ~p.~p), renegotiate~n",
 			  [Major, InitIn#init_in.minor]),
-    send([
+    send(State#state.opid,
+	 [
 	  #out_header{error=0, unique=Header#in_header.unique},
 	  #init_out{major=?API_MAJOR,
 		    minor=?API_MINOR
@@ -99,7 +124,8 @@ negotiate(Major, Header, InitIn, State) when Major > ?API_MAJOR ->
 	 ]),
     {next_state, connecting, State}; % remain in connecting state
 negotiate(_Major, Header, _InitIn, State) ->
-    send(#out_header{error=?EPROTO, unique=Header#in_header.unique}),
+    send(State#state.opid,
+	 #out_header{error=-?EPROTO, unique=Header#in_header.unique}),
     {stop, "Incompatible Protocol", State}.
 
 idle(State) ->

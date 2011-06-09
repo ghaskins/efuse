@@ -2,7 +2,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/3]).
+-export([start_link/3, start_child/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -17,16 +17,16 @@
 start_link(MountPoint, Handler, Cookie) ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, [MountPoint, Handler, Cookie]).
 
+start_child(ChildSpec) ->
+    supervisor:start_child(?MODULE, ChildSpec).
+
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
 init([MountPoint, Handler, Cookie]) ->
-    {ok, Fd} = fuse:mount(MountPoint),
-
     {ok, { {one_for_all, 5, 10},
 	   [
-	    ?CHILD(input_chan, [Fd, Handler, Cookie]),
-	    ?CHILD(output_chan, [Fd])
+	    ?CHILD(input_chan, [MountPoint, Handler, Cookie])
 	   ]} }.
 
