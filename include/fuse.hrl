@@ -85,3 +85,5 @@
 	       atime=0, mtime=0, ctime=0,
 	       atimensec=0, mtimensec=0, ctimensec=0,
 	       mode=0, nlink=0, uid=0, gid=0, rdev=0, blksize=0}).
+
+-record(open_out, {fh=0, flags=0}).

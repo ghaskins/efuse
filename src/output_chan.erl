@@ -113,5 +113,7 @@ encode(#attr{timeout=Timeout, timeoutnsec=Timeoutnsec,
       Rdev:32/native,
       Blksize:32/native,
       0:32>>; %padding
+encode(#open_out{fh=Fh, flags=Flags}) ->
+    <<Fh:64/native, Flags:32/native, 0:32/native>>;
 encode(Datum) ->
     erlang:throw({"unsupported datum", Datum}). 

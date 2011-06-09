@@ -83,8 +83,13 @@ decode(?FUSE_REMOVEXATTR, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
 decode(?FUSE_FLUSH, _Header, _Payload, _State) ->         
     {ok, -?ENOSYS, []};
-decode(?FUSE_OPENDIR, _Header, _Payload, _State) ->       
-    {ok, -?ENOSYS, []};
+decode(?FUSE_OPENDIR, _Header, <<Flags:32/native, _/binary>>, State) -> 
+    Module = State#state.handler,
+    try Module:opendir(Flags, State#state.cookie)
+    catch
+	error:undef ->
+	    {ok, 0, [#open_out{flags=Flags}]}
+    end;
 decode(?FUSE_READDIR, _Header, _Payload, _State) ->       
     {ok, -?ENOSYS, []};
 decode(?FUSE_RELEASEDIR, _Header, _Payload, _State) ->    
