@@ -91,4 +91,6 @@
 
 -record(read_in, {fh, offset, size, read_flags, lock_owner, flags}).
 
+-record(release_in, {fh, flags, release_flags, lock_owner}).
+
 -record(dirent, {ino, name, type=0}).

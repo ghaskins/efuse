@@ -99,8 +99,14 @@ decode(?FUSE_READDIR, Header, Payload, State) ->
 					  ReadIn#read_in.size),
 	    {ok, 0, Data}
     end;
-decode(?FUSE_RELEASEDIR, _Header, _Payload, _State) ->    
-    {ok, -?ENOSYS, []};
+decode(?FUSE_RELEASEDIR, Header, Payload, State) -> 
+    Module = State#state.handler,
+    ReleaseIn = fuse_packet:release_in(Payload),
+    try Module:releasedir(Header, ReleaseIn, State#state.cookie)
+    catch
+	error:undef ->
+	    {ok, 0, []}
+    end;
 decode(?FUSE_FSYNCDIR, _Header, _Payload, _State) ->      
     {ok, -?ENOSYS, []};
 decode(?FUSE_GETLK, _Header, _Payload, _State) ->         

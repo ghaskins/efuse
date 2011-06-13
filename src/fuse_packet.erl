@@ -34,3 +34,10 @@ read_in(<<Fh:64/native,
 	  _:32>>) ->
     #read_in{fh=Fh, offset=Offset, size=Size, read_flags=ReadFlags,
 	     lock_owner=LockOwner, flags=Flags}.
+
+release_in(<<Fh:64/native,
+	     Flags:32/native,
+	     ReleaseFlags:32/native,
+	     LockOwner:64/native>>) ->
+    #release_in{fh=Fh, flags=Flags, release_flags=ReleaseFlags,
+		lock_owner=LockOwner}.
