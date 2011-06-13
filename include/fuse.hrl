@@ -86,4 +86,9 @@
 	       atimensec=0, mtimensec=0, ctimensec=0,
 	       mode=0, nlink=0, uid=0, gid=0, rdev=0, blksize=0}).
 
+-record(open_in, {flags}).
 -record(open_out, {fh=0, flags=0}).
+
+-record(read_in, {fh, offset, size, read_flags, lock_owner, flags}).
+
+-record(dirent, {ino, name, type=0}).

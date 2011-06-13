@@ -14,6 +14,7 @@ dirs:
 
 compile: $(REBAR)
 	@$(REBAR) compile
+	@$(REBAR) eunit
 
 clean: $(REBAR)
 	@$(REBAR) clean

@@ -24,11 +24,7 @@ safe_decode(OpCode, Header, Payload, State) ->
      error:undef ->
 	 error_logger:error_msg("OpCode: ~p undefined~n",
 				[OpCode]),
-	 {ok, -?ENOSYS, []};
-     T:E ->
-	 error_logger:error_msg("General request failure: H:~p P:~p E: ~p:~p~n",
-				[Header, Payload, T, E]),
-	 {ok, -1, []}
+	 {ok, -?ENOSYS, []}
  end.    
 
 decode(?FUSE_LOOKUP, _Header, _Payload, _State) ->
@@ -37,7 +33,7 @@ decode(?FUSE_FORGET, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
 decode(?FUSE_GETATTR, Header, _Payload, State) ->
     Module = State#state.handler,
-    Module:getattr(Header#in_header.nodeid, State#state.cookie);
+    Module:getattr(Header, State#state.cookie);
 decode(?FUSE_SETATTR, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
 decode(?FUSE_READLINK, _Header, _Payload, _State) ->
@@ -83,15 +79,26 @@ decode(?FUSE_REMOVEXATTR, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
 decode(?FUSE_FLUSH, _Header, _Payload, _State) ->         
     {ok, -?ENOSYS, []};
-decode(?FUSE_OPENDIR, _Header, <<Flags:32/native, _/binary>>, State) -> 
+decode(?FUSE_OPENDIR, Header, Payload, State) -> 
     Module = State#state.handler,
-    try Module:opendir(Flags, State#state.cookie)
+    OpenIn = fuse_packet:open_in(Payload),
+    try Module:opendir(Header, OpenIn, State#state.cookie)
     catch
 	error:undef ->
-	    {ok, 0, [#open_out{flags=Flags}]}
+	    {ok, 0, [#open_out{flags=OpenIn#open_in.flags}]}
     end;
-decode(?FUSE_READDIR, _Header, _Payload, _State) ->       
-    {ok, -?ENOSYS, []};
+decode(?FUSE_READDIR, Header, Payload, State) ->       
+    Module = State#state.handler,
+    ReadIn = fuse_packet:read_in(Payload),
+    case Module:readdir(Header, ReadIn, State#state.cookie) of
+	{ok, Error, Result} -> {ok, Error, Result};
+	{dirents, Dirents} ->
+	    {ok, EncodedData} = dirent:encode(Dirents),
+	    {ok, Data} = util:binary_part(EncodedData,
+					  ReadIn#read_in.offset,
+					  ReadIn#read_in.size),
+	    {ok, 0, Data}
+    end;
 decode(?FUSE_RELEASEDIR, _Header, _Payload, _State) ->    
     {ok, -?ENOSYS, []};
 decode(?FUSE_FSYNCDIR, _Header, _Payload, _State) ->      
