@@ -80,11 +80,13 @@
 -record(kstatfs, {blocks=0, bfree=0, bavail=0, files=0,
 		  ffree=0, bsize=0, namelen=0, frsize=0}).
 
--record(getattr_in, {flags, fh}).
--record(attr, {timeout=1, timeoutnsec=0, ino, size=0, blocks=0,
+-record(attr, {ino, size=0, blocks=0,
 	       atime=0, mtime=0, ctime=0,
 	       atimensec=0, mtimensec=0, ctimensec=0,
 	       mode=0, nlink=0, uid=0, gid=0, rdev=0, blksize=0}).
+
+-record(getattr_in, {flags, fh}).
+-record(attr_out, {timeout=1, attr=#attr{}}).
 
 -record(open_in, {flags}).
 -record(open_out, {fh=0, flags=0}).
@@ -94,3 +96,6 @@
 -record(release_in, {fh, flags, release_flags, lock_owner}).
 
 -record(dirent, {ino, name, type=0}).
+
+-record(entry_out, {ino, generation=0, attr_timeout=1,
+		    entry_timeout=1, attr=#attr{}}).

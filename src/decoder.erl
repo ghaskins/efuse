@@ -27,8 +27,10 @@ safe_decode(OpCode, Header, Payload, State) ->
 	 {ok, -?ENOSYS, []}
  end.    
 
-decode(?FUSE_LOOKUP, _Header, _Payload, _State) ->
-    {ok, -?ENOSYS, []};
+decode(?FUSE_LOOKUP, Header, Payload, State) ->
+    Module = State#state.handler,
+    Name = binary:bin_to_list(Payload, {0, size(Payload)-1}),
+    Module:lookup(Header, Name, State#state.cookie);
 decode(?FUSE_FORGET, _Header, _Payload, _State) ->	
     {ok, -?ENOSYS, []};
 decode(?FUSE_GETATTR, Header, _Payload, State) ->

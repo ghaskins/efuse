@@ -88,16 +88,20 @@ encode(#kstatfs{blocks=Blocks, bfree=Bfree, bavail=Bavail,
       Namelen:32/native,
       Frsize:32/native,
       0:224>>;
-encode(#attr{timeout=Timeout, timeoutnsec=Timeoutnsec,
-	     ino=Ino, size=Size, blocks=Blocks,
+encode(#attr_out{timeout=Timeout, attr=Attr}) ->
+
+    BinaryAttr = encode(Attr),
+
+    <<Timeout:64/native,
+      0:32, % unused nsec field
+      0:32, % "dummy" padding
+      BinaryAttr/binary>>;
+encode(#attr{ino=Ino, size=Size, blocks=Blocks,
 	     atime=Atime, mtime=Mtime, ctime=Ctime,
 	     atimensec=Atimensec, mtimensec=Mtimensec, ctimensec=Ctimensec,
 	     mode=Mode, nlink=Nlink,
 	     uid=Uid, gid=Gid, rdev=Rdev, blksize=Blksize}) ->
-    <<Timeout:64/native,
-      Timeoutnsec:32/native,
-      0:32, %padding
-      Ino:64/native,
+    <<Ino:64/native,
       Size:64/native,
       Blocks:64/native,
       Atime:64/native,
@@ -113,6 +117,18 @@ encode(#attr{timeout=Timeout, timeoutnsec=Timeoutnsec,
       Rdev:32/native,
       Blksize:32/native,
       0:32>>; %padding
+encode(#entry_out{ino=Ino, generation=Generation,
+		  attr_timeout=AttrTimeout, entry_timeout=EntryTimeout,
+		  attr=Attr}) ->
+
+    BinaryAttr = encode(Attr#attr{ino=Ino}),
+
+    <<Ino:64/native,
+      Generation:64/native,
+      EntryTimeout:64/native,
+      AttrTimeout:64/native,
+      0:64,  % unused nsec timeouts
+      BinaryAttr/binary>>;
 encode(#open_out{fh=Fh, flags=Flags}) ->
     <<Fh:64/native, Flags:32/native, 0:32/native>>;
 encode(Datum) ->

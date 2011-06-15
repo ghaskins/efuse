@@ -28,11 +28,6 @@ encode(Dirents) ->
 				  Type:32/native,
 				  BinaryName/binary,
 				  Padding/binary>>,
-
-		if
-		    size(EncodedDirent) =:= Size -> ok
-		end,
-
 		{EncodedDirent, NewOffset}
 	end,
     {Data, _} = lists:mapfoldl(F, 0, Dirents),
