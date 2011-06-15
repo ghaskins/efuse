@@ -67,6 +67,21 @@
 -define(S_IWOTH   , 8#000002). % others have write permission
 -define(S_IXOTH   , 8#000001). % others have execute permission
 
+-define(O_ACCMODE ,	8#00003).
+-define(O_RDONLY  ,	8#00000).
+-define(O_WRONLY  ,	8#00001).
+-define(O_RDWR	  ,	8#00002).
+-define(O_CREAT	  ,	8#00100).
+-define(O_EXCL	  ,	8#00200).
+-define(O_NOCTTY  ,	8#00400).
+-define(O_TRUNC	  ,	8#01000).
+-define(O_APPEND  ,	8#02000).
+-define(O_NONBLOCK,	8#04000).
+-define(O_NDELAY  ,	O_NONBLOCK).
+-define(O_SYNC	  ,	8#10000).
+-define(O_FSYNC	  ,	 O_SYNC).
+-define(O_ASYNC	  ,	8#20000).
+
 -define(IN_HEADER_SIZE, 40).
 -define(OUT_HEADER_SIZE, 16).
 -record(in_header, {len, opcode, unique, nodeid, uid, gid, pid}).
