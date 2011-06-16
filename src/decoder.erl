@@ -75,8 +75,14 @@ decode(?FUSE_STATFS, _Header, _Payload, State) ->
 	error:undef ->
 	    {ok, 0, [#kstatfs{namelen=255, bsize=512}]}
     end;
-decode(?FUSE_RELEASE, _Header, _Payload, _State) ->       
-    {ok, -?ENOSYS, []};
+decode(?FUSE_RELEASE, Header, Payload, State) ->
+    Module = State#state.handler,
+    ReleaseIn = fuse_packet:release_in(Payload),
+    try Module:release(Header, ReleaseIn, State#state.cookie)
+    catch
+	error:undef ->
+	    {ok, 0, []}
+    end;
 decode(?FUSE_FSYNC , _Header, _Payload, _State) ->        
     {ok, -?ENOSYS, []};
 decode(?FUSE_SETXATTR, _Header, _Payload, _State) ->      
