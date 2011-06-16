@@ -62,8 +62,10 @@ decode(?FUSE_OPEN, Header, Payload, State) ->
 	error:undef ->
 	    {ok, 0, [#open_out{flags=OpenIn#open_in.flags}]}
     end;
-decode(?FUSE_READ, _Header, _Payload, _State) ->  
-    {ok, -?ENOSYS, []};
+decode(?FUSE_READ, Header, Payload, State) ->
+    Module = State#state.handler,
+    ReadIn = fuse_packet:read_in(Payload),
+    Module:read(Header, ReadIn, State#state.cookie);
 decode(?FUSE_WRITE, _Header, _Payload, _State) -> 
     {ok, -?ENOSYS, []};
 decode(?FUSE_STATFS, _Header, _Payload, State) ->

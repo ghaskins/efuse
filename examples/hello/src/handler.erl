@@ -7,9 +7,21 @@
 mount(MountPoint) ->
     efuse:mount(MountPoint, ?MODULE, []).
 
+hello_str() -> "Hello, World!".
+
 % root inode
-getattr(#in_header{nodeid=1}, _Cookie) ->
-    {ok, 0, [#attr_out{attr=#attr{ino=1, mode=?S_IFDIR bor 8#755, nlink=2}}]}.
+getattr(1) ->
+    #attr{ino=1,
+	  mode=?S_IFDIR bor 8#755,
+	  nlink=2};
+getattr(2) ->
+    #attr{ino=2,
+	  mode=?S_IFREG bor 8#444,
+	  nlink=1,
+	  size=length(hello_str())}.
+
+getattr(#in_header{nodeid=NodeId}, _Cookie) ->
+    {ok, 0, [#attr_out{attr=getattr(NodeId)}]}.
 
 readdir(#in_header{nodeid=1}, _ReadIn, _Cookie) ->
     {dirents, [
@@ -20,8 +32,7 @@ readdir(#in_header{nodeid=1}, _ReadIn, _Cookie) ->
     }.
 
 lookup(#in_header{nodeid=1}, "hello", _Cookie) ->
-    {ok, 0, [#entry_out{ino=2, attr=#attr{mode=?S_IFREG bor 8#444,
-					  nlink=1, size=5}}]};
+    {ok, 0, [#entry_out{ino=2, attr=getattr(2)}]};
 lookup(_, _, _) ->
     {ok, -?ENOENT, []}.
 
@@ -35,6 +46,16 @@ open(#in_header{nodeid=2}, OpenIn, _Cookie) ->
     end;
 open(_, _, _) ->
     {ok, -?ENOENT, []}.
+
+read(#in_header{nodeid=2}, ReadIn, _Cookie) ->
+    EncodedData = binary:list_to_bin(hello_str()),
+    {ok, Data} = util:binary_part([EncodedData],
+				  ReadIn#read_in.offset,
+				  ReadIn#read_in.size),
+    {ok, 0, Data};
+read(_, _, _) ->
+    {ok, -?ENOENT, []}.
+
     
 
     
