@@ -21,21 +21,18 @@ process(Header, Payload, State) ->
 safe_decode(OpCode, Header, Payload, State) ->
  try decode(OpCode, Header, Payload, State)
  catch
-     error:undef ->
-	 error_logger:error_msg("OpCode: ~p undefined~n",
-				[OpCode]),
+     throw:nohandler ->
+	 error_logger:error_msg("OpCode: ~p undefined ~n", [OpCode]),
 	 {ok, -?ENOSYS, []}
  end.    
 
 decode(?FUSE_LOOKUP, Header, Payload, State) ->
-    Module = State#state.handler,
     Name = binary:bin_to_list(Payload, {0, size(Payload)-1}),
-    Module:lookup(Header, Name, State#state.cookie);
+    eval(lookup, [Header, Name, State#state.cookie], State);
 decode(?FUSE_FORGET, _Header, _Payload, _State) ->	
     {ok, -?ENOSYS, []};
 decode(?FUSE_GETATTR, Header, _Payload, State) ->
-    Module = State#state.handler,
-    Module:getattr(Header, State#state.cookie);
+    eval(getattr, [Header, State#state.cookie], State);
 decode(?FUSE_SETATTR, _Header, _Payload, _State) ->
     {ok, -?ENOSYS, []};
 decode(?FUSE_READLINK, _Header, _Payload, _State) ->
@@ -55,32 +52,28 @@ decode(?FUSE_RENAME, _Header, _Payload, _State) ->
 decode(?FUSE_LINK, _Header, _Payload, _State) ->  
     {ok, -?ENOSYS, []};
 decode(?FUSE_OPEN, Header, Payload, State) -> 
-    Module = State#state.handler,
     OpenIn = fuse_packet:open_in(Payload),
-    try Module:open(Header, OpenIn, State#state.cookie)
+    try eval(open, [Header, OpenIn, State#state.cookie], State)
     catch
-	error:undef ->
+	throw:nohandler ->
 	    {ok, 0, [#open_out{flags=OpenIn#open_in.flags}]}
     end;
 decode(?FUSE_READ, Header, Payload, State) ->
-    Module = State#state.handler,
     ReadIn = fuse_packet:read_in(Payload),
-    Module:read(Header, ReadIn, State#state.cookie);
+    eval(read, [Header, ReadIn, State#state.cookie], State);
 decode(?FUSE_WRITE, _Header, _Payload, _State) -> 
     {ok, -?ENOSYS, []};
 decode(?FUSE_STATFS, _Header, _Payload, State) ->
-    Module = State#state.handler,
-    try Module:statfs(State#state.cookie)
+    try eval(statfs, [State#state.cookie], State)
     catch
-	error:undef ->
+	throw:nohandler ->
 	    {ok, 0, [#kstatfs{namelen=255, bsize=512}]}
     end;
 decode(?FUSE_RELEASE, Header, Payload, State) ->
-    Module = State#state.handler,
     ReleaseIn = fuse_packet:release_in(Payload),
-    try Module:release(Header, ReleaseIn, State#state.cookie)
+    try eval(release, [Header, ReleaseIn, State#state.cookie], State)
     catch
-	error:undef ->
+	throw:nohandler ->
 	    {ok, 0, []}
     end;
 decode(?FUSE_FSYNC , _Header, _Payload, _State) ->        
@@ -96,17 +89,15 @@ decode(?FUSE_REMOVEXATTR, _Header, _Payload, _State) ->
 decode(?FUSE_FLUSH, _Header, _Payload, _State) ->         
     {ok, -?ENOSYS, []};
 decode(?FUSE_OPENDIR, Header, Payload, State) -> 
-    Module = State#state.handler,
     OpenIn = fuse_packet:open_in(Payload),
-    try Module:opendir(Header, OpenIn, State#state.cookie)
+    try eval(opendir, [Header, OpenIn, State#state.cookie], State)
     catch
-	error:undef ->
+	throw:nohandler ->
 	    {ok, 0, [#open_out{flags=OpenIn#open_in.flags}]}
     end;
 decode(?FUSE_READDIR, Header, Payload, State) ->       
-    Module = State#state.handler,
     ReadIn = fuse_packet:read_in(Payload),
-    case Module:readdir(Header, ReadIn, State#state.cookie) of
+    case eval(readdir, [Header, ReadIn, State#state.cookie], State) of
 	{ok, Error, Result} -> {ok, Error, Result};
 	{dirents, Dirents} ->
 	    {ok, EncodedData} = dirent:encode(Dirents),
@@ -116,11 +107,10 @@ decode(?FUSE_READDIR, Header, Payload, State) ->
 	    {ok, 0, Data}
     end;
 decode(?FUSE_RELEASEDIR, Header, Payload, State) -> 
-    Module = State#state.handler,
     ReleaseIn = fuse_packet:release_in(Payload),
-    try Module:releasedir(Header, ReleaseIn, State#state.cookie)
+    try eval(releasedir, [Header, ReleaseIn, State#state.cookie], State)
     catch
-	error:undef ->
+	throw:nohandler ->
 	    {ok, 0, []}
     end;
 decode(?FUSE_FSYNCDIR, _Header, _Payload, _State) ->      
@@ -150,3 +140,11 @@ decode(?FUSE_NOTIFY_REPLY, _Header, _Payload, _State) ->
 decode(?FUSE_BATCH_FORGET, _Header, _Payload, _State) ->  
     {ok, -?ENOSYS, []}.
 
+eval(Function, Args, State) ->
+    Module = State#state.handler,
+    case erlang:function_exported(Module, Function, length(Args)) of
+	true ->
+	    erlang:apply(Module, Function, Args);
+	false ->
+	    throw(nohandler)
+    end.
